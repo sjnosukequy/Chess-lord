@@ -26,8 +26,8 @@ class Game:
         self.p1_name = "Player 1"
         self.p2_name = "Minimax"
 
-        self.p1_timer = Timer(600, "bot")
-        self.p2_timer = Timer(600, "top")
+        self.p1_timer = Timer(4800, "bot")
+        self.p2_timer = Timer(4800, "top")
 
         self.p1_color = WHITE
         self.p2_color = BLACK
@@ -37,6 +37,8 @@ class Game:
 
         self.board = Board(self.p1_color)
         self.board.initialize_pieces()
+
+        self.auto = False
 
         self.menu_screen()
 
@@ -80,14 +82,17 @@ class Game:
         self.board = Board(value)
         self.board.initialize_pieces()
 
-    def set_ai(self, tup, value):
+    def set_ai(self, tup, idx):
         """
         Updates name of AI to correspond to underlying method of move choice
         :param tup: tuple containing color as a string and as an RGB tuple (tuple)
         :param value: numerical value representing AI (int)
         :return: None
         """
-        self.p2_name = tup[0]
+        self.p2_name = tup[0][0]
+    
+    def set_Auto(self, tup, idx):
+        self.auto = eval(tup[0][0])
 
     def menu_screen(self):
         """
@@ -105,8 +110,8 @@ class Game:
         menu.add.label("ChessAI", align=pygame_menu.locals.ALIGN_CENTER, font_name=pygame_menu.font.FONT_OPEN_SANS_BOLD,
                        font_color=LARGE_TEXT_COLOR, font_size=90, margin=(0, 50))
         menu.add.text_input('Name : ', default=self.p1_name, maxchar=10, onchange=self.set_name)
-        menu.add.selector('Color : ', [('White', WHITE), ('Black', BLACK)], onchange=self.set_color)
-        menu.add.selector('AI : ', [('Minimax', 1), ('Random', 2)], onchange=self.set_ai)
+        menu.add.selector('AI : ', [('Minimax', 0), ('Random', 1)], onchange=self.set_ai)
+        menu.add.selector('Auto Play : ', [('False', 0), ('True', 1)], onchange=self.set_Auto)
         menu.add.button('Play', self.game_screen)
         menu.add.button('Quit', pygame_menu.events.EXIT)
         menu.add.label("", align=pygame_menu.locals.ALIGN_CENTER, font_color=BLACK, font_size=70, margin=(0, 50))
@@ -133,7 +138,7 @@ class Game:
         """
         # Determine move based on selected AI
         if self.p2_name == "Minimax":
-            self.ai_move.put(AI.minimax(self.board.copy(), 200, inf, -inf, True, self.p2_color)[0])
+            self.ai_move.put(AI.minimax(self.board.copy(), 950, inf, -inf, True, self.p2_color)[0])
         else:
             self.ai_move.put(AI.random_move(self.board))
 
@@ -262,10 +267,12 @@ class Game:
             pygame.display.flip()
 
             # Self-play
-            # if self.board.turn == self.p1_color:
-            #     move = AI.random_move(self.board)
-            #     self.board.make_move(move[0], move[1])
-            #     self.board.next_turn()
+            if self.auto:
+                if self.board.turn == self.p1_color:
+                    move = AI.minimax(self.board.copy(), 3, inf, -inf, False, self.p1_color)[0]
+                    # move = AI.random_move(self.board)
+                    self.board.make_move(move[0], move[1])
+                    self.board.next_turn()
 
     def end_screen(self, condition, winner=None):
         """
@@ -329,9 +336,10 @@ class Game:
             pygame.display.flip()
 
             # Self-play
-            # time.sleep(1)
-            # self.reset()
-            # return self.game_screen()
+            if self.auto:
+                time.sleep(1)
+                self.reset()
+                return self.game_screen()
 
     def draw_names(self):
         """
