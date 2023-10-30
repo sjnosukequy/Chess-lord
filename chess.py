@@ -11,8 +11,9 @@ from timer import Timer
 pygame.init()
 
 # Fonts
-FONT = pygame.font.Font(pygame_menu.font.FONT_OPEN_SANS_BOLD, 18)
-BIG_FONT = pygame.font.Font(pygame_menu.font.FONT_OPEN_SANS_BOLD, 26)
+FONT = pygame.font.Font('font/Abaddon Bold.ttf', 25)
+BIG_FONT = pygame.font.Font('font/Abaddon Bold.ttf', 30)
+VERY_BIG_FONT = pygame.font.Font('font/Abaddon Bold.ttf', 70)
 
 # Title and Icon
 pygame.display.set_caption("ChessAI")
@@ -33,12 +34,20 @@ class Game:
         self.p2_color = BLACK
 
         self.ai_move = queue.Queue()
+        self.aip1_move = queue.Queue()
         self.lock = threading.Lock()
 
         self.board = Board(self.p1_color)
         self.board.initialize_pieces()
 
         self.auto = False
+        self.BHealth = self.board.blackScore
+        self.BCurrent = self.board.blackScore
+        self.B_Check_Count = 0
+
+        self.WHealth = self.board.whiteScore
+        self.WCurrent = self.board.blackScore
+        self.W_Check_Count = 0
 
         self.menu_screen()
 
@@ -55,6 +64,7 @@ class Game:
         self.board = Board(self.p1_color)
         self.board.initialize_pieces()
         self.ai_move = queue.Queue()
+        self.aip1_move = queue.Queue()
 
     def set_name(self, name):
         """
@@ -103,11 +113,12 @@ class Game:
                                         #  menubar_close_button=False,
                                          widget_font_color=SMALL_TEXT_COLOR,
                                          background_color=BG_COLOR,
-                                         widget_font=pygame_menu.font.FONT_OPEN_SANS_BOLD,
+                                         widget_font=BIG_FONT,
                                          cursor_color=WHITE)
 
         menu = pygame_menu.Menu(height=SCREEN_HEIGHT, width=SCREEN_WIDTH, title="", theme=theme)
-        menu.add.label("ChessAI", align=pygame_menu.locals.ALIGN_CENTER, font_name=pygame_menu.font.FONT_OPEN_SANS_BOLD,
+        
+        menu.add.label("MEGA ChessAI", align=pygame_menu.locals.ALIGN_CENTER, font_name=VERY_BIG_FONT,
                        font_color=LARGE_TEXT_COLOR, font_size=90, margin=(0, 50))
         menu.add.text_input('Name : ', default=self.p1_name, maxchar=10, onchange=self.set_name)
         menu.add.selector('AI : ', [('Minimax', 0), ('Random', 1)], onchange=self.set_ai)
@@ -138,7 +149,7 @@ class Game:
         """
         # Determine move based on selected AI
         if self.p2_name == "Minimax":
-            self.ai_move.put(AI.minimax(self.board.copy(), 950, inf, -inf, True, self.p2_color)[0])
+            self.ai_move.put(AI.minimax(self.board.copy(), 3, -inf, inf, True, self.p2_color)[0])
         else:
             self.ai_move.put(AI.random_move(self.board))
 
@@ -159,13 +170,13 @@ class Game:
 
         # Create a thread which will be used to determine AI's move concurrently with rest of game
         t = threading.Thread(target=self.determine_move)
+        t2 = threading.Thread(target= self.auto_play, args=('Minimax', ))
 
         # Keeps track of whether or not human player has resigned
         p1_resigned = False
 
         # Creates collision box for resign button
-        resign_button = pygame.Rect(BOARD_X + BOARD_SIZE + 8, BOARD_Y + BOARD_SIZE + 8,
-                                    int((TILE_SIZE * 4 + 8) / 2 - 4), 28)
+        resign_button = pygame.Rect(BOARD_X + BOARD_SIZE + 8, BOARD_Y + BOARD_SIZE + 8, int((TILE_SIZE * 4 + 8) / 2 - 4), 28)
 
         # Game screen loop
         while True:
@@ -177,13 +188,17 @@ class Game:
                     exit()
                 # Check if any buttons were pressed or pieces were selected
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    self.board.select()
+                    if not self.auto:
+                        self.board.select()
                     mouse_pos = event.pos
                     self.board.draw()
                     pygame.display.flip()
                     # Resign button was pressed
                     if resign_button.collidepoint(mouse_pos):
                         p1_resigned = True
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        self.board.print()
 
             # Draw background first (everything else goes on top of it)
             SCREEN.fill(BG_COLOR)
@@ -265,14 +280,51 @@ class Game:
 
             # Update display
             pygame.display.flip()
-
             # Self-play
             if self.auto:
                 if self.board.turn == self.p1_color:
-                    move = AI.minimax(self.board.copy(), 3, inf, -inf, False, self.p1_color)[0]
-                    # move = AI.random_move(self.board)
-                    self.board.make_move(move[0], move[1])
-                    self.board.next_turn()
+                    if self.aip1_move.qsize() == 0 and not self.board.gameover and not t2.is_alive():
+                        self.lock.acquire()
+                        t2 = threading.Thread(target= self.auto_play, args=('Minimax', ))
+                        t2.start()
+                        self.lock.release()
+                    
+                    if self.aip1_move.qsize() > 0 and not self.board.gameover:
+                        # self.BHealth = self.board.blackScore
+                        # if self.BHealth == self.BCurrent:
+                        #     self.B_Check_Count += 1
+                        # else:
+                        #     self.BCurrent = self.BHealth
+                        # print(self.B_Check_Count)
+
+                        # if self.B_Check_Count >= 3:
+                        #     self.B_Check_Count = 0
+                        #     print('random')
+                        #     move = self.aip1_move.get()
+                        #     # move = AI.random_move(self.board)  
+                        # else:
+                        #     move = self.aip1_move.get()
+                        
+                        move = self.aip1_move.get()
+                        self.board.make_move(move[0], move[1])
+                        self.board.next_turn()
+                    
+
+
+    def auto_play(self, type):
+        """
+        Determines move for AI and places move in thread-safe container (Queue)
+        :return: None
+        """
+        # Determine move based on selected AI
+        if type == "Minimax":
+            self.aip1_move.put(AI.minimax(self.board.copy(), 3, -inf, inf, False, self.p2_color)[0])
+        else:
+            self.aip1_move.put(AI.random_move(self.board))
+
+        # Close thread after move has been found
+        sys.exit()
+
 
     def end_screen(self, condition, winner=None):
         """
@@ -336,10 +388,10 @@ class Game:
             pygame.display.flip()
 
             # Self-play
-            if self.auto:
-                time.sleep(1)
-                self.reset()
-                return self.game_screen()
+            # if self.auto:
+            #     time.sleep(1)
+            #     self.reset()
+            #     return self.game_screen()
 
     def draw_names(self):
         """
@@ -353,7 +405,7 @@ class Game:
         # Draw bottom name (player 1)
         pygame.draw.rect(SCREEN, BG_COLOR_LIGHT, [BOARD_X, BOARD_Y + BOARD_SIZE + 8, TILE_SIZE * 2, 28])
         p2name = FONT.render(self.p1_name, True, SMALL_TEXT_COLOR)
-        SCREEN.blit(p2name, (BOARD_X + 4, BOARD_Y + BOARD_SIZE + 10))
+        SCREEN.blit(p2name, (BOARD_X + 4, BOARD_Y + BOARD_SIZE + 11))
 
     def draw_turn_indicator(self):
         """
@@ -361,11 +413,15 @@ class Game:
         :return: None
         """
         if self.board.turn == self.p1_color:
-            txt = FONT.render("YOUR TURN", True, LARGE_TEXT_COLOR)
-            SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.5 + 8), BOARD_Y + BOARD_SIZE + 10))
+            if not self.auto:
+                txt = FONT.render("YOUR TURN", True, LARGE_TEXT_COLOR)
+                SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.5 + 5), BOARD_Y + BOARD_SIZE + 10))
+            else:
+                txt = FONT.render("YOUR AI IS THINKING...", True, LARGE_TEXT_COLOR)
+                SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.5 - 50), BOARD_Y + BOARD_SIZE + 10))
         else:
-            txt = FONT.render("AI is thinking...", True, LARGE_TEXT_COLOR)
-            SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.5 + 8), BOARD_Y + BOARD_SIZE + 10))
+            txt = FONT.render("OPPONENT AI IS THINKING...", True, LARGE_TEXT_COLOR)
+            SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.5 - 80), BOARD_Y + BOARD_SIZE + 10))
 
     @staticmethod
     def draw_resign_button():
@@ -373,8 +429,7 @@ class Game:
         Draws resign button in game screen
         :return: None
         """
-        pygame.draw.rect(SCREEN, BG_COLOR_LIGHT, [BOARD_X + BOARD_SIZE + 8, BOARD_Y + BOARD_SIZE + 8,
-                                                  int((TILE_SIZE * 4 + 8) / 2 - 4), 28])
+        pygame.draw.rect(SCREEN, BG_COLOR_LIGHT, [BOARD_X + BOARD_SIZE + 8, BOARD_Y + BOARD_SIZE + 8, int((TILE_SIZE * 4 + 8) / 2 - 4), 28])
         txt = FONT.render("Resign", True, SMALL_TEXT_COLOR)
         SCREEN.blit(txt, (BOARD_X + BOARD_SIZE + 40, BOARD_Y + BOARD_SIZE + 10))
 
@@ -399,25 +454,25 @@ class Game:
         # Draw win condition and winner (if applicable)
         if winner:
             txt = FONT.render(winner + " won", True, SMALL_TEXT_COLOR)
-            SCREEN.blit(txt, (BOARD_X + TILE_SIZE * 3, BOARD_Y + TILE_SIZE * 3 + 4))
+            SCREEN.blit(txt, (BOARD_X + TILE_SIZE * 3 - 10, BOARD_Y + TILE_SIZE * 3 + 4))
             txt = FONT.render(f"by {condition}", True, SMALL_TEXT_COLOR)
-            SCREEN.blit(txt, (BOARD_X + TILE_SIZE * 3, int(BOARD_Y + TILE_SIZE * 3.4)))
+            SCREEN.blit(txt, (BOARD_X + TILE_SIZE * 3 - 10, int(BOARD_Y + TILE_SIZE * 3.4)))
         else:
             txt = FONT.render(f"{condition}", True, SMALL_TEXT_COLOR)
             if condition == "Insufficient Material":
-                SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 2.55), int(BOARD_Y + TILE_SIZE * 3.3)))
+                SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 2.55) - 10, int(BOARD_Y + TILE_SIZE * 3.3)))
             else:
-                SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.2), int(BOARD_Y + TILE_SIZE * 3.3)))
+                SCREEN.blit(txt, (int(BOARD_X + TILE_SIZE * 3.2) - 10, int(BOARD_Y + TILE_SIZE * 3.3)))
 
         # Draw Rematch button
         pygame.draw.rect(SCREEN, BLACK, [bg.left, bg.bottom - 28, bg.centerx - bg.left + 3, 28], 1)
         txt = FONT.render("Rematch", True, SMALL_TEXT_COLOR)
-        SCREEN.blit(txt, (bg.left + 8, bg.bottom - 28 + 2))
+        SCREEN.blit(txt, (bg.left + 2, bg.bottom - 28 + 4))
 
         # Draw Leave button
         pygame.draw.rect(SCREEN, BLACK, [bg.centerx + 2, bg.bottom - 28, bg.centerx - bg.left - 2, 28], 1)
         txt = FONT.render("Leave", True, SMALL_TEXT_COLOR)
-        SCREEN.blit(txt, (bg.centerx + 20, bg.bottom - 28 + 2))
+        SCREEN.blit(txt, (bg.centerx + 10, bg.bottom - 28 + 4))
 
 
 if __name__ == "__main__":

@@ -2,19 +2,19 @@ import os
 
 from settings import *
 
-K_b = pygame.image.load(os.path.join("img", "king-black.png"))
-Q_b = pygame.image.load(os.path.join("img", "queen-black.png"))
-B_b = pygame.image.load(os.path.join("img", "bishop-black.png"))
-H_b = pygame.image.load(os.path.join("img", "knight-black.png"))
-R_b = pygame.image.load(os.path.join("img", "rook-black.png"))
-P_b = pygame.image.load(os.path.join("img", "pawn-black.png"))
+K_b = pygame.image.load(os.path.join("img", "black_king.png"))
+Q_b = pygame.image.load(os.path.join("img", "black_queen.png"))
+B_b = pygame.image.load(os.path.join("img", "black_bishop.png"))
+H_b = pygame.image.load(os.path.join("img", "black_knight.png"))
+R_b = pygame.image.load(os.path.join("img", "black_rook.png"))
+P_b = pygame.image.load(os.path.join("img", "black_pawn.png"))
 
-K_w = pygame.image.load(os.path.join("img", "king-white.png"))
-Q_w = pygame.image.load(os.path.join("img", "queen-white.png"))
-B_w = pygame.image.load(os.path.join("img", "bishop-white.png"))
-H_w = pygame.image.load(os.path.join("img", "knight-white.png"))
-R_w = pygame.image.load(os.path.join("img", "rook-white.png"))
-P_w = pygame.image.load(os.path.join("img", "pawn-white.png"))
+K_w = pygame.image.load(os.path.join("img", "white_king.png"))
+Q_w = pygame.image.load(os.path.join("img", "white_queen.png"))
+B_w = pygame.image.load(os.path.join("img", "white_bishop.png"))
+H_w = pygame.image.load(os.path.join("img", "white_knight.png"))
+R_w = pygame.image.load(os.path.join("img", "white_rook.png"))
+P_w = pygame.image.load(os.path.join("img", "white_pawn.png"))
 
 IMAGES = [pygame.transform.scale(K_w, IMG_SCALE),
           pygame.transform.scale(K_b, IMG_SCALE),
@@ -44,10 +44,14 @@ class Piece:
         Draws piece
         :return: None
         """
+        cords = list(to_coords(self.x, self.y))
+        #OFFSETS
+        cords[0] += 2
+        cords[1] += 2
         if self.color == WHITE:
-            SCREEN.blit(IMAGES[self.image], to_coords(self.x, self.y))
+            SCREEN.blit(IMAGES[self.image], cords)
         else:
-            SCREEN.blit(IMAGES[self.image+1], to_coords(self.x, self.y))
+            SCREEN.blit(IMAGES[self.image + 1], cords)
 
     def move(self, x, y):
         """
@@ -81,7 +85,6 @@ class King(Piece):
 
     def valid_moves(self, board):
         moves = []
-
         # Move 1 in each direction
         for x in range(self.x-1, self.x+2):
             for y in range(self.y-1, self.y+2):

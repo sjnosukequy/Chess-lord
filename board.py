@@ -22,8 +22,8 @@ class Board:
         self.gameover = None
 
         self.weights = {King: 900, Queen: 90, Rook: 50, Bishop: 30, Knight: 30, Pawn: 10}
-        self.blackScore = 1290
-        self.whiteScore = 1290
+        self.blackScore = 1280
+        self.whiteScore = 1280
 
         self.past_moves = []
 
@@ -246,8 +246,7 @@ class Board:
         :param color: color of player that is moving (tuple)
         :return: bool
         """
-        if self.in_bounds(dest) \
-                and (not self.piece_at_coords(dest) or self.enemy_at_coords(dest, color)):
+        if self.in_bounds(dest) and (not self.piece_at_coords(dest) or self.enemy_at_coords(dest, color)):
             return True
         return False
 
@@ -367,6 +366,10 @@ class Board:
         if type(source_tile.piece) is Pawn:
             if (self.bottomPlayerTurn and dest_tile.y == 0) or (not self.bottomPlayerTurn and dest_tile.y == 7):
                 source_tile.piece = Queen(source_tile.piece.x, source_tile.piece.y, source_tile.piece.color)
+                if source_tile.piece.color == BLACK:
+                    self.blackScore += self.weights[type(source_tile.piece)]
+                else:
+                    self.whiteScore += self.weights[type(source_tile.piece)]
 
         # Move piece from source tile to dest tile
         dest_tile.piece = source_tile.piece
@@ -461,7 +464,17 @@ class Board:
                                 moves.insert(0, ((x, y), move))
                             else:
                                 moves.append(((x, y), move))
-        return list(set(moves))          # converting to set then back to list has randomizing effect on moves
+        if not moves:
+            for x in range(8):
+                for y in range(8):
+                    if self.piece_at_coords((x, y)) and self.tilemap[x][y].piece.color == self.turn:
+                        for move in self.tilemap[x][y].piece.valid_moves(self):
+                                if self.enemy_at_coords(move, self.turn):
+                                    moves.insert(0, ((x, y), move))
+                                else:
+                                    moves.append(((x, y), move))
+        
+        return list(set(moves))         # converting to set then back to list has randomizing effect on moves
 
     def get_moves_sorted(self):
         """
