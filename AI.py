@@ -41,11 +41,11 @@ def minimax(board, depth, alpha, beta, maximizing_player, maximizing_color):
     if depth == 0 or board.gameover:
        return None, evaluate(board, maximizing_color)
     moves = board.get_moves()
-    try:
-        best_move = random.choice(moves)
-    except:
-        moves = board.get_moves_sorted()
-        best_move = random.choice(moves)
+    # try:
+    #     best_move = random.choice(moves)
+    # except:
+    #     moves = board.get_moves_sorted()
+    #     best_move = random.choice(moves)
 
     if maximizing_player:
         max_eval = -inf

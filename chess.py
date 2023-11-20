@@ -44,6 +44,7 @@ class Game:
         self.BHealth = self.board.blackScore
         self.BCurrent = self.board.blackScore
         self.B_Check_Count = 0
+        self.diff = 1
 
         self.WHealth = self.board.whiteScore
         self.WCurrent = self.board.blackScore
@@ -103,6 +104,9 @@ class Game:
     
     def set_Auto(self, tup, idx):
         self.auto = eval(tup[0][0])
+    
+    def set_Diff(self, tup, idx):
+        self.diff = tup[0][1]
 
     def menu_screen(self):
         """
@@ -123,6 +127,7 @@ class Game:
         menu.add.text_input('Name : ', default=self.p1_name, maxchar=10, onchange=self.set_name)
         menu.add.selector('AI : ', [('Minimax', 0), ('Random', 1)], onchange=self.set_ai)
         menu.add.selector('Auto Play : ', [('False', 0), ('True', 1)], onchange=self.set_Auto)
+        menu.add.selector('Difficulty : ', [('Easy', 1), ('Normal', 2), ('Hard', 3)], onchange=self.set_Diff)
         menu.add.button('Play', self.game_screen)
         menu.add.button('Quit', pygame_menu.events.EXIT)
         menu.add.label("", align=pygame_menu.locals.ALIGN_CENTER, font_color=BLACK, font_size=70, margin=(0, 50))
@@ -149,7 +154,7 @@ class Game:
         """
         # Determine move based on selected AI
         if self.p2_name == "Minimax":
-            self.ai_move.put(AI.minimax(self.board.copy(), 3, -inf, inf, True, self.p2_color)[0])
+            self.ai_move.put(AI.minimax(self.board.copy(), self.diff, -inf, inf, True, self.p2_color)[0])
         else:
             self.ai_move.put(AI.random_move(self.board))
 
